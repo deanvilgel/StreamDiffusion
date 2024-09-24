@@ -14,14 +14,16 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 def main(
     input: str = os.path.join(CURRENT_DIR, "..", "..", "images", "inputs", "input.png"),
-    output: str = os.path.join(CURRENT_DIR, "..", "..", "images", "outputs", "output.png"),
+    output: str = os.path.join(
+        CURRENT_DIR, "..", "..", "images", "outputs", "output3.png"
+    ),
     model_id_or_path: str = "KBlueLeaf/kohaku-v2.1",
     lora_dict: Optional[Dict[str, float]] = None,
-    prompt: str = "1girl with brown dog hair, thick glasses, smiling",
+    prompt: str = '"a red cat playing with a ball"0.01, "jungle"',
     negative_prompt: str = "low quality, bad quality, blurry, low resolution",
     width: int = 512,
     height: int = 512,
-    acceleration: Literal["none", "xformers", "tensorrt"] = "xformers",
+    acceleration: Literal["none", "xformers", "tensorrt"] = "none",
     use_denoising_batch: bool = True,
     guidance_scale: float = 1.2,
     cfg_type: Literal["none", "full", "self", "initialize"] = "self",

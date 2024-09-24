@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Input</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+        }
+    </style>
+</head>
+
+<body>
+    <h2>Enter your prompt</h2>
+    <input type="text" id="promptInput" placeholder="Type your prompt here...">
+    <h4 id="current Prompts">orange slices on table, fruitful color, detailed section of a fruit, sliced fruit</h4>
+    <h2>Hue Shift</h2>
+    <input type="range" id="hue" min="0" max="100" value="0">
+    <h2>Saturation</h2>
+    <input type="range" id="sat" min="0" max="100" value="100">
+    <h2>Value</h2>
+    <input type="range" id="val" min="50" max="150" value="100">
+
+
+
+    <!-- Include SocketIO JavaScript library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
+    <script>
+
+        const promptExample = [
+            "Huge Computer",
+            "Vibrant Coral Reef",
+            "Large Spilled Ice Cream",
+            "Crystal Cave",
+            "Giant Wave Ocean",
+            "Golden Pyramid",
+            "Molten Gold",
+            "Floating Hot Air Balloon",
+            "Section of Orange",
+            "Whale Breaching the Ocean",
+            "Big Fluffy Cloud",
+            "Glowing Jellyfish",
+            "Frozen Glacier",
+            "Burning Meteor",
+            "Shimmering Starfield",
+            "Towering Redwoods",
+            "Electric Lightning Bolt",
+            "Cracked Desert Earth",
+            "Enormous Moon",
+            "Twinkling Fireflies",
+            "Majestic Mountain Peak",
+            "Giant Spider Web",
+            "Massive Waterfall",
+            "Floating Space Station",
+            "Deep Canyon",
+            "Colorful Aurora"
+        ];
+
+        // Connect to the SocketIO server
+        const socket = io.connect('http://' + document.domain + ':' + location.port);
+
+        // Function to select a random prompt key from promptExample
+        function getNextPrompt(currentText) {
+            // Assuming `promptExample` is an array of prompts
+
+            const currentIndex = promptExample.indexOf(currentText)
+            const nextIndex = (currentIndex + 1) % (promptExample.length);
+            const selected = promptExample[nextIndex];
+            console.log(nextIndex);
+            return selected;
+        }
+
+        // Select input fields for HSV
+        const hueInput = document.getElementById('hue');
+        const saturationInput = document.getElementById('sat');
+        const valueInput = document.getElementById('val');
+
+        const promptValue = document.getElementById('current Prompts')
+
+        // Function to generate random HSV values
+        function getRandomHSV() {
+            return {
+                hue: Math.floor(Math.random() * 100), // Hue range: 0 to 360
+                sat: Math.floor(Math.random() * 100), // Saturation range: 0 to 100
+                val: Math.floor(Math.random() * 100) + 50, // Value range: 0 to 100
+            };
+        }
+
+        // Linear interpolation (lerp) function
+        function lerp(start, end, t) {
+            return start + (end - start) * t;
+        }
+
+        // Function to update HSV with random values every 5 seconds
+        function updateHSVPeriodically() {
+            setInterval(() => {
+                // Get random HSV and prompt
+                const newHSV = getRandomHSV();
+                const newPrompt = getNextPrompt(promptValue.innerText);
+
+
+
+                // // Get current HSV values from inputs
+                // const currentHSV = {
+                //     hue: parseInt(hueInput.value) || 0,
+                //     sat: parseInt(saturationInput.value) || 0,
+                //     val: parseInt(valueInput.value) || 0,
+                // };
+
+                // const currentPrompt = promptValue.innerText
+
+                // Start lerping between current and new HSV
+                // emitLerpedHSV(currentHSV, newHSV, currentPrompt, newPrompt);
+                // Emit the random prompt
+                socket.emit('update_prompt', { prompt: newPrompt });
+                // Emit the lerped values
+                socket.emit('update_hsv', newHSV);
+                // Update input fields to new random values
+                hueInput.value = newHSV.hue;
+                saturationInput.value = newHSV.sat;
+                valueInput.value = newHSV.val;
+                promptValue.innerText = newPrompt;
+            }, 5000); // Every 5 seconds
+        }
+
+        // Start the periodic HSV update
+        updateHSVPeriodically();
+    </script>
+</body>
+
+</html>
+
+
+
+<!-- 
+const promptExample = {
+    "orange slices on table, fruitful color, detailed section of a fruit, sliced fruit": 1,
+    "MegaFlora, LargeForest, Large Greenary, small river": 0,
+    "MegaStruction, Metallic City, Made of Metal or Glass": 0
+}
+
+// Connect to the SocketIO server
+const socket = io.connect('http://' + document.domain + ':' + location.port);
+// Debounce function to delay the execution of a function
+function debounce(func, delay) {
+    let timeout;
+    return function (...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), delay);
+    };
+}
+// Select the input field
+const promptInput = document.getElementById('promptInput');
+
+// Add an event listener to detect changes and send to the server
+// Debounced function to emit the prompt to the server
+const debouncedEmitPrompt = debounce(() => {
+    const prompt = promptInput.value;
+    // Emit the updated prompt to the server
+    socket.emit('update_prompt', { prompt: prompt });
+}, 500); // Delay of 1000 milliseconds (1 second)
+
+// Event listener for the input event, using the debounced function
+promptInput.addEventListener('input', debouncedEmitPrompt);
+
+
+
+
+// Select the input field
+const hueInput = document.getElementById('hue');
+const saturationInput = document.getElementById('sat');
+const valueInput = document.getElementById('val');
+
+const updateHSV = debounce(() => {
+    const hue = hueInput.value;
+    const sat = saturationInput.value;
+    const val = valueInput.value;
+    socket.emit('update_hsv', { hue: hue, sat: sat, val: val });
+}, 500)
+
+hueInput.addEventListener('input', updateHSV);
+saturationInput.addEventListener('input', updateHSV);
+valueInput.addEventListener('input', updateHSV); -->
