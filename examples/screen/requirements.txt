@@ -2,3 +2,4 @@ matplotlib
 pillow
 mss
 flask_socketio
+screeninfo

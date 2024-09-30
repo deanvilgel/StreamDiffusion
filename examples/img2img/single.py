@@ -19,7 +19,7 @@ def main(
     ),
     model_id_or_path: str = "KBlueLeaf/kohaku-v2.1",
     lora_dict: Optional[Dict[str, float]] = None,
-    prompt: str = '"a red cat playing with a ball"0.01, "jungle"',
+    prompt: str = "'(Big Fluffy Cloud)--',,'single color', 'realism',  'extremely realistic', 'simple background', 'center focused', 'vignette', 'high resolution', 'single object'",
     negative_prompt: str = "low quality, bad quality, blurry, low resolution",
     width: int = 512,
     height: int = 512,

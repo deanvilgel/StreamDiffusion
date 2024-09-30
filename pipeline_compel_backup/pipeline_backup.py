@@ -4,6 +4,8 @@ from typing import List, Optional, Union, Any, Dict, Tuple, Literal
 import numpy as np
 import PIL.Image
 import torch
+
+import compel
 from diffusers import LCMScheduler, StableDiffusionPipeline
 from diffusers.image_processor import VaeImageProcessor
 from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img import (
@@ -71,10 +73,14 @@ class StreamDiffusion:
 
         self.scheduler = LCMScheduler.from_config(self.pipe.scheduler.config)
         self.text_encoder = pipe.text_encoder
+        self.tokenizer = pipe.tokenizer
         self.unet = pipe.unet
         self.vae = pipe.vae
 
         self.inference_time_ema = 0
+
+        # Initialize Compel
+        self.compel = compel.Compel(self.tokenizer, self.text_encoder)
 
     def load_lcm_lora(
         self,
@@ -159,13 +165,13 @@ class StreamDiffusion:
         do_classifier_free_guidance = False
         if self.guidance_scale > 1.0:
             do_classifier_free_guidance = True
-
         encoder_output = self.pipe.encode_prompt(
-            prompt=prompt,
+            prompt="",
+            prompt_embeds=self.compel(prompt),
             device=self.device,
             num_images_per_prompt=1,
             do_classifier_free_guidance=do_classifier_free_guidance,
-            negative_prompt=negative_prompt,
+            negative_prompt_embeds=self.compel(negative_prompt),
         )
         self.prompt_embeds = encoder_output[0].repeat(self.batch_size, 1, 1)
 
@@ -254,31 +260,15 @@ class StreamDiffusion:
         )
 
     @torch.no_grad()
-    def update_prompt(self, alpha: float, prompt: str) -> None:
-
-        if prompt != self.last_prompt:
-            self.current_encoder_output = self.pipe.encode_prompt(
-                prompt=prompt,
-                device=self.device,
-                num_images_per_prompt=1,
-                do_classifier_free_guidance=False,
-            )[0].repeat(self.batch_size, 1, 1)
-            self.last_encoder_output = self.current_encoder_output
-            self.last_prompt = prompt
-        elif self.current_encoder_output == None:
-            self.current_encoder_output = self.pipe.encode_prompt(
-                prompt=prompt,
-                device=self.device,
-                num_images_per_prompt=1,
-                do_classifier_free_guidance=False,
-            )
-
-        if self.last_encoder_output != None:
-            self.prompt_embeds = (
-                1 - alpha
-            ) * self.last_encoder_output + alpha * self.current_encoder_output
-        else:
-            self.prompt_embeds = self.last_encoder_output
+    def update_prompt(self, prompt: str) -> None:
+        encoder_output = self.pipe.encode_prompt(
+            prompt="",
+            prompt_embeds=self.compel(prompt),
+            device=self.device,
+            num_images_per_prompt=1,
+            do_classifier_free_guidance=False,
+        )
+        self.prompt_embeds = encoder_output[0].repeat(self.batch_size, 1, 1)
 
     def add_noise(
         self,

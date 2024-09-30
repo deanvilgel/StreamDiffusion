@@ -15,6 +15,7 @@ import tkinter as tk
 import server
 from torchvision.transforms import functional as torchFunc
 import warnings
+from screeninfo import get_monitors
 
 warnings.filterwarnings("ignore")
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
@@ -22,37 +23,41 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", ".."))
 from utils.viewer import receive_images
 from utils.wrapper import StreamDiffusionWrapper
 
+
 inputs = []
 top = 0
 left = 0
 import numpy as np
 
 
-def start_flask_server(prompt_queue, hsv_queue):
-    """
-    Starts the Flask server defined in server.py.
+# def start_flask_server(prompt_queue, hsv_queue):
+#     """
+#     Starts the Flask server defined in server.py.
 
-    Parameters:
-    prompt_queue (Queue): The queue to pass to the Flask server for prompt updates.
-    """
-    server.prompt_queue = prompt_queue  # Share the queue with the server
-    server.hsv_queue = hsv_queue
-    server.socketio.run(server.app, host="0.0.0.0", port=5000)
+#     Parameters:
+#     prompt_queue (Queue): The queue to pass to the Flask server for prompt updates.
+#     """
+#     server.prompt_queue = prompt_queue  # Share the queue with the server
+#     server.hsv_queue = hsv_queue
+#     server.socketio.run(server.app, host="0.0.0.0", port=5000)
 
 
 def screen(
     event: threading.Event,
-    height: int = 512,
-    width: int = 512,
-    monitor: Dict[str, int] = {"top": 300, "left": 200, "width": 512, "height": 512},
+    width: int = 720,
+    height: int = 405,
+    monitor: Dict[str, int] = {"top": 0, "left": 0, "width": 720, "height": 405},
 ):
     global inputs
+    # mss 0은 전체 모니터, 나머지 순서는 기준 모름 tk 는 디스플레이에 적힌대로 따라가는듯
     with mss.mss() as sct:
         while True:
             if event.is_set():
                 print("terminate read thread")
                 break
-            img = sct.grab(monitor)
+            img = sct.grab(
+                sct.monitors[3]
+            )  # 여기 숫자 변경하면 사용모니터 변경가능, 1 ,2, 3 중에 때려맞추셈
             img = PIL.Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
             img.resize((height, width))
             inputs.append(pil2tensor(img))
@@ -82,7 +87,13 @@ def dummy_screen(
 
     root.bind("<Configure>", update_geometry)
     root.mainloop()
-    return {"top": top, "left": left, "width": width, "height": height}
+    mornitor_used = get_monitors()[2]  # get mornitor input from 3rd mornitor
+    return {
+        "top": mornitor_used.x,
+        "left": mornitor_used.y,
+        "width": mornitor_used.width,
+        "height": mornitor_used.height,
+    }
 
 
 def monitor_setting_process(
@@ -174,13 +185,12 @@ def image_generation_process(
     common_prompt = "'single color', 'realism',  'extremely realistic', 'simple background', 'center focused', 'vignette', 'high resolution', 'single object'"
 
     current_prompt = prompt
-    last_prompt = prompt
     target_hue = hue = 0.5
     target_sat = sat = 1.0
     target_val = val = 1.0
-    prompt_lerp_threshold = 0.8
+    prompt_lerp_threshold = 0.9
     prompt_lerp = 1
-    hsv_lerp_threshold = 0.8
+    hsv_lerp_threshold = 0.9
 
     last_valid_image = None
     global inputs
@@ -258,14 +268,16 @@ def image_generation_process(
             )
 
             out_prompt = current_prompt
-            prompt_lerp = prompt_lerp * prompt_lerp_threshold
-            if prompt_lerp >= 0.98:
-                out_prompt = last_prompt
-            elif prompt_lerp <= 0.02:
-                out_prompt = current_prompt
-                last_prompt = current_prompt
-            else:
-                out_prompt = f"('{last_prompt}'{round(prompt_lerp,2)}, '{current_prompt}'{round(1-prompt_lerp,2)})"
+
+            # if prompt_lerp >= 0.98:
+            #     out_prompt = last_prompt
+            # elif prompt_lerp <= 0.02:
+            #     out_prompt = current_prompt
+            #     last_prompt = current_prompt
+            # else:
+            #     last_minus_count = int(math.log(prompt_lerp, 0.95))
+            #     current_minus_count = int(math.log(1 - prompt_lerp, 0.95))
+            #     out_prompt = f"'{last_prompt}') {last_minus_count * '-'}, ('{current_prompt}'){current_minus_count*'-'},"
 
             start_time = time.time()
             sampled_inputs = []
@@ -277,14 +289,15 @@ def image_generation_process(
             input_batch = torch.cat(sampled_inputs)
 
             input_batch = (input_batch + 1) / 2
-
+            input_batch = torchFunc.resize(input_batch, (width, height))
             with torch.no_grad():
                 input_batch = torchFunc.adjust_hue(input_batch, hue)
                 input_batch = torchFunc.adjust_saturation(input_batch, sat)
                 input_batch = torchFunc.adjust_brightness(input_batch, val)
-            print("using", out_prompt + "," + common_prompt)
-            stream.stream.update_prompt(prompt=out_prompt + "," + common_prompt)
-
+            stream.stream.update_prompt(
+                prompt="(" + out_prompt + ")," + common_prompt, alpha=prompt_lerp
+            )
+            prompt_lerp = prompt_lerp * prompt_lerp_threshold
             input_batch = (input_batch) * 2 - 1
 
             inputs.clear()
@@ -317,14 +330,14 @@ def image_generation_process(
 def main(
     model_id_or_path: str = "philz1337x/cyberrealistic-classic",
     lora_dict: Optional[Dict[str, float]] = {
-        "C:/Users/ERSATZ-CAMPUSTOWN/StreamDiffusion/models/LoRA/Unreal.safetensors": 1,
+        # "C:/Users/ERSATZ-CAMPUSTOWN/StreamDiffusion/models/LoRA/Unreal.safetensors": 1,
         "C:/Users/ERSATZ-CAMPUSTOWN/StreamDiffusion/models/LoRA/more_details.safetensors": 1,
     },
     prompt: str = "architectural rendering, beautiful interior",
     negative_prompt: str = "ugly, complex, dull, low quality, bad quality, blurry, low resolution, noise, fog",
     frame_buffer_size: int = 1,
-    width: int = 512,
-    height: int = 512,
+    width: int = 720,
+    height: int = 405,
     acceleration: Literal["none", "xformers", "tensorrt"] = "xformers",
     use_denoising_batch: bool = True,
     seed: int = 2,
@@ -348,14 +361,6 @@ def main(
     close_queue = Queue()
 
     monitor_sender, monitor_receiver = ctx.Pipe()
-    flask_process = Process(
-        target=start_flask_server,
-        args=(
-            prompt_queue,
-            hsv_queue,
-        ),
-    )
-    flask_process.start()
 
     process1 = ctx.Process(
         target=image_generation_process,
@@ -387,11 +392,13 @@ def main(
     )
     process1.start()
 
+    moniter_width = 1920
+    moniter_height = 1080
     monitor_process = ctx.Process(
         target=monitor_setting_process,
         args=(
-            width,
-            height,
+            moniter_width,
+            moniter_height,
             monitor_sender,
         ),
     )
@@ -410,7 +417,6 @@ def main(
     if process1.is_alive():
         print("process1 still alive. force killing...")
         process1.terminate()  # force kill...
-        flask_process.terminate()
     process1.join()
     print("process1 terminated.")
 
