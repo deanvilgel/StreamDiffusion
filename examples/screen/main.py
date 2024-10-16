@@ -30,16 +30,16 @@ left = 0
 import numpy as np
 
 
-# def start_flask_server(prompt_queue, hsv_queue):
-#     """
-#     Starts the Flask server defined in server.py.
+def start_flask_server(prompt_queue, hsv_queue):
+    """
+    Starts the Flask server defined in server.py.
 
-#     Parameters:
-#     prompt_queue (Queue): The queue to pass to the Flask server for prompt updates.
-#     """
-#     server.prompt_queue = prompt_queue  # Share the queue with the server
-#     server.hsv_queue = hsv_queue
-#     server.socketio.run(server.app, host="0.0.0.0", port=5000)
+    Parameters:
+    prompt_queue (Queue): The queue to pass to the Flask server for prompt updates.
+    """
+    server.prompt_queue = prompt_queue  # Share the queue with the server
+    server.hsv_queue = hsv_queue
+    server.socketio.run(server.app, host="0.0.0.0", port=5000)
 
 
 def screen(
@@ -56,7 +56,7 @@ def screen(
                 print("terminate read thread")
                 break
             img = sct.grab(
-                sct.monitors[3]
+                sct.monitors[2]
             )  # 여기 숫자 변경하면 사용모니터 변경가능, 1 ,2, 3 중에 때려맞추셈
             img = PIL.Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
             img.resize((height, width))
@@ -185,9 +185,13 @@ def image_generation_process(
     common_prompt = "'single color', 'realism',  'extremely realistic', 'simple background', 'center focused', 'vignette', 'high resolution', 'single object'"
 
     current_prompt = prompt
-    target_hue = hue = 0.5
-    target_sat = sat = 1.0
-    target_val = val = 1.0
+    # target_hue = hue = 0.5
+    # target_sat = sat = 1.0
+    # target_val = val = 1.0
+    target_r = r = 0.5
+    target_g = g = 1.0
+    target_b = b = 1.0
+
     prompt_lerp_threshold = 0.9
     prompt_lerp = 1
     hsv_lerp_threshold = 0.9
@@ -238,46 +242,52 @@ def image_generation_process(
                 continue
             if not hsv_queue.empty():
                 new_hsv = hsv_queue.get_nowait()
-                new_hsv = [(x / 100) for x in new_hsv]
-                target_hue, target_sat, target_val = new_hsv
-                target_hue -= 0.5
+
+                target_r, target_g, target_b = new_hsv
+                # new_hsv = [(x / 100) for x in new_hsv]
+                # target_hue, target_sat, target_val = new_hsv
+                # target_hue -= 0.5
                 # print(f"hsv updated to: {target_hue}, {target_sat}, {target_val}")
 
             if not prompt_queue.empty():
                 new_prompt = prompt_queue.get_nowait()  # Non-blocking queue retrieval
                 print(f"prompt updated to: {new_prompt}")
                 if new_prompt != current_prompt:
-                    last_prompt = current_prompt
                     current_prompt = new_prompt
                     prompt_lerp = 1
 
-            hue = (
-                hue * hsv_lerp_threshold + (1 - hsv_lerp_threshold) * target_hue
-                if target_hue
-                else hue
+            # hue = (
+            #     hue * hsv_lerp_threshold + (1 - hsv_lerp_threshold) * target_hue
+            #     if target_hue
+            #     else hue
+            # )
+            # sat = (
+            #     sat * hsv_lerp_threshold + (1 - hsv_lerp_threshold) * target_sat
+            #     if target_sat
+            #     else sat
+            # )
+            # val = (
+            #     val * hsv_lerp_threshold + (1 - hsv_lerp_threshold) * target_val
+            #     if target_val
+            #     else val
+            # )
+            r = (
+                r * hsv_lerp_threshold + (1 - hsv_lerp_threshold) * target_r
+                if target_r
+                else r
             )
-            sat = (
-                sat * hsv_lerp_threshold + (1 - hsv_lerp_threshold) * target_sat
-                if target_sat
-                else sat
+            g = (
+                g * hsv_lerp_threshold + (1 - hsv_lerp_threshold) * target_g
+                if target_g
+                else g
             )
-            val = (
-                val * hsv_lerp_threshold + (1 - hsv_lerp_threshold) * target_val
-                if target_val
-                else val
+            b = (
+                b * hsv_lerp_threshold + (1 - hsv_lerp_threshold) * target_b
+                if target_b
+                else b
             )
 
             out_prompt = current_prompt
-
-            # if prompt_lerp >= 0.98:
-            #     out_prompt = last_prompt
-            # elif prompt_lerp <= 0.02:
-            #     out_prompt = current_prompt
-            #     last_prompt = current_prompt
-            # else:
-            #     last_minus_count = int(math.log(prompt_lerp, 0.95))
-            #     current_minus_count = int(math.log(1 - prompt_lerp, 0.95))
-            #     out_prompt = f"'{last_prompt}') {last_minus_count * '-'}, ('{current_prompt}'){current_minus_count*'-'},"
 
             start_time = time.time()
             sampled_inputs = []
@@ -290,10 +300,27 @@ def image_generation_process(
 
             input_batch = (input_batch + 1) / 2
             input_batch = torchFunc.resize(input_batch, (width, height))
-            with torch.no_grad():
-                input_batch = torchFunc.adjust_hue(input_batch, hue)
-                input_batch = torchFunc.adjust_saturation(input_batch, sat)
-                input_batch = torchFunc.adjust_brightness(input_batch, val)
+
+            # overlay
+            overlay_color = torch.tensor(
+                [r / 255, g / 255, b / 255]
+            )  # 순수한 붉은색 (R, G, B)
+            overlay_batch = overlay_color.view(3, 1, 1).expand_as(input_batch)
+            # alpha = 0.5  # 오버레이 강도 (0: 원본 이미지, 1: 오버레이 색상)
+            # input_batch = (1 - alpha) * input_batch + alpha * overlay_batch
+            input_batch = (
+                1 - 2 * overlay_batch
+            ) * input_batch**2 + 2 * overlay_batch * input_batch
+
+            # hsv adjustment
+            # with torch.no_grad():
+            #     input_batch = torchFunc.adjust_hue(input_batch, hue)
+            #     input_batch = torchFunc.adjust_saturation(input_batch, sat)
+            #     input_batch = torchFunc.adjust_brightness(input_batch, val)
+
+            input_batch = torchFunc.autocontrast(input_batch)
+
+            print("alpha", prompt_lerp)
             stream.stream.update_prompt(
                 prompt="(" + out_prompt + ")," + common_prompt, alpha=prompt_lerp
             )
@@ -328,10 +355,19 @@ def image_generation_process(
 
 
 def main(
-    model_id_or_path: str = "philz1337x/cyberrealistic-classic",
+    ###### SF Background
+    # model_id_or_path: str = "philz1337x/cyberrealistic-classic",
+    ###### Anime Background
+    model_id_or_path: str = "Lykon/DreamShaper",
+    ###### Architecture
+    # model_id_or_path: str = "a34384300/XSarchitectural-InteriorDesign-ForXSLora",
     lora_dict: Optional[Dict[str, float]] = {
         # "C:/Users/ERSATZ-CAMPUSTOWN/StreamDiffusion/models/LoRA/Unreal.safetensors": 1,
         "C:/Users/ERSATZ-CAMPUSTOWN/StreamDiffusion/models/LoRA/more_details.safetensors": 1,
+        # "C:/Users/ERSATZ-CAMPUSTOWN/StreamDiffusion/models/LoRA/aidma-Image Upgrader-SD1.5-V0.1.safetensors": 1,
+        # "C:/Users/ERSATZ-CAMPUSTOWN/StreamDiffusion/models/LoRA/Movie_Style_Backgrounds.safetensors": 1,
+        # "C:/Users/ERSATZ-CAMPUSTOWN/StreamDiffusion/models/LoRA/XSarchitectural-38InteriorForBedroom.safetensors": 1,
+        # "C:/Users/ERSATZ-CAMPUSTOWN/StreamDiffusion/models/LoRA/xsarchitectural-7.safetensors": 1,
     },
     prompt: str = "architectural rendering, beautiful interior",
     negative_prompt: str = "ugly, complex, dull, low quality, bad quality, blurry, low resolution, noise, fog",
@@ -361,6 +397,14 @@ def main(
     close_queue = Queue()
 
     monitor_sender, monitor_receiver = ctx.Pipe()
+    flask_process = Process(
+        target=start_flask_server,
+        args=(
+            prompt_queue,
+            hsv_queue,
+        ),
+    )
+    flask_process.start()
 
     process1 = ctx.Process(
         target=image_generation_process,
@@ -417,6 +461,7 @@ def main(
     if process1.is_alive():
         print("process1 still alive. force killing...")
         process1.terminate()  # force kill...
+        flask_process.terminate()
     process1.join()
     print("process1 terminated.")
 

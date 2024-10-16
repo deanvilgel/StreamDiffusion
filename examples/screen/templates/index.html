@@ -64,7 +64,13 @@
             "Colorful Aurora", //대, 화려/다색, 자연
             "Deep Canyon", //대, 갈/황, 돌
         ];
-
+        const colorExample = [
+            "#BF1B39",
+            "#5CACF2",
+            "#F2DB66",
+            "#F2A649",
+            "#590202",
+        ];
         // Connect to the SocketIO server
         const socket = io.connect('http://' + document.domain + ':' + location.port);
 
@@ -95,6 +101,16 @@
             };
         }
 
+        function getRandomColor() {
+            hex = colorExample[Math.floor(Math.random() * colorExample.length)]
+            var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : null;
+        }
+
         // Linear interpolation (lerp) function
         function lerp(start, end, t) {
             return start + (end - start) * t;
@@ -106,24 +122,14 @@
                 // Get random HSV and prompt
                 const newHSV = getRandomHSV();
                 const newPrompt = getNextPrompt(promptValue.innerText);
+                const randomColor = getRandomColor();
 
-
-
-                // // Get current HSV values from inputs
-                // const currentHSV = {
-                //     hue: parseInt(hueInput.value) || 0,
-                //     sat: parseInt(saturationInput.value) || 0,
-                //     val: parseInt(valueInput.value) || 0,
-                // };
-
-                // const currentPrompt = promptValue.innerText
-
-                // Start lerping between current and new HSV
-                // emitLerpedHSV(currentHSV, newHSV, currentPrompt, newPrompt);
                 // Emit the random prompt
                 socket.emit('update_prompt', { prompt: newPrompt });
                 // Emit the lerped values
                 socket.emit('update_hsv', newHSV);
+
+                socket.emit('update_rgb', randomColor)
                 // Update input fields to new random values
                 hueInput.value = newHSV.hue;
                 saturationInput.value = newHSV.sat;

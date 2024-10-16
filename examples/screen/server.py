@@ -26,14 +26,24 @@ def handle_update_prompt(data):
     print(f"Received new prompt: {prompt}")
 
 
-@socketio.on("update_hsv")
-def handle_update_csv(data):
-    hue = data.get("hue", 0)
-    sat = data.get("sat", 100)
-    val = data.get("val", 100)
+# @socketio.on("update_hsv")
+# def handle_update_csv(data):
+#     hue = data.get("hue", 0)
+#     sat = data.get("sat", 100)
+#     val = data.get("val", 100)
+#     # print(hue, sat, val)
+#     hsv_queue.put([int(hue), int(sat), int(val)])
+#     print(f"Received new prompt: {hue, sat, val}")
+
+
+@socketio.on("update_rgb")
+def handle_update_rgb(data):
+    r = data.get("r", 0)
+    g = data.get("g", 0)
+    b = data.get("b", 0)
     # print(hue, sat, val)
-    hsv_queue.put([int(hue), int(sat), int(val)])
-    print(f"Received new prompt: {hue, sat, val}")
+    hsv_queue.put([int(r), int(g), int(b)])
+    print(f"Received new color {r, g, b}")
 
 
 # Start the Flask app with SocketIO
