@@ -61,7 +61,8 @@ class StreamDiffusion:
 
         self.do_add_noise = do_add_noise
         self.use_denoising_batch = use_denoising_batch
-
+        self.current_encoder_output = None
+        self.last_encoder_output = None
         self.similar_image_filter = False
         self.similar_filter = SimilarImageFilter()
         self.prev_image_result = None
@@ -75,6 +76,8 @@ class StreamDiffusion:
         self.vae = pipe.vae
 
         self.inference_time_ema = 0
+
+        self.last_prompt = ("",)
 
     def load_lcm_lora(
         self,
@@ -130,6 +133,7 @@ class StreamDiffusion:
         num_inference_steps: int = 50,
         guidance_scale: float = 1.2,
         delta: float = 1.0,
+        strength: float = 1.0,
         generator: Optional[torch.Generator] = torch.Generator(),
         seed: int = 2,
     ) -> None:
@@ -180,8 +184,10 @@ class StreamDiffusion:
             self.prompt_embeds = torch.cat(
                 [uncond_prompt_embeds, self.prompt_embeds], dim=0
             )
-
-        self.scheduler.set_timesteps(num_inference_steps, self.device)
+        self.num_inference_steps = num_inference_steps
+        self.scheduler.set_timesteps(
+            num_inference_steps, self.device, strength=strength
+        )
         self.timesteps = self.scheduler.timesteps.to(self.device)
 
         # make sub timesteps list based on the indices in the t_list list and the values in the timesteps list
@@ -257,28 +263,28 @@ class StreamDiffusion:
     def update_prompt(self, alpha: float, prompt: str) -> None:
 
         if prompt != self.last_prompt:
+            if self.current_encoder_output != None:
+                self.last_encoder_output = self.current_encoder_output
             self.current_encoder_output = self.pipe.encode_prompt(
                 prompt=prompt,
                 device=self.device,
                 num_images_per_prompt=1,
                 do_classifier_free_guidance=False,
             )[0].repeat(self.batch_size, 1, 1)
-            self.last_encoder_output = self.current_encoder_output
-            self.last_prompt = prompt
-        elif self.current_encoder_output == None:
-            self.current_encoder_output = self.pipe.encode_prompt(
-                prompt=prompt,
-                device=self.device,
-                num_images_per_prompt=1,
-                do_classifier_free_guidance=False,
-            )
 
-        if self.last_encoder_output != None:
-            self.prompt_embeds = (
-                1 - alpha
-            ) * self.last_encoder_output + alpha * self.current_encoder_output
-        else:
-            self.prompt_embeds = self.last_encoder_output
+            self.last_prompt = prompt
+
+        self.prompt_embeds = (alpha) * self.last_encoder_output + (
+            1 - alpha
+        ) * self.current_encoder_output
+
+    def update_strength(
+        self,
+        strength: float,
+    ) -> None:
+        self.scheduler.set_timesteps(
+            self.num_inference_steps, self.device, strength=strength
+        )
 
     def add_noise(
         self,

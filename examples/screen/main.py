@@ -14,6 +14,7 @@ import fire
 import tkinter as tk
 import server
 from torchvision.transforms import functional as torchFunc
+from torchvision.transforms import GaussianBlur as torchBlur
 import warnings
 from screeninfo import get_monitors
 
@@ -129,6 +130,7 @@ def image_generation_process(
     monitor_receiver: Connection,
     prompt_queue: Queue,
     hsv_queue: Queue,
+    strength: float,
 ) -> None:
     """
     Process for generating images based on a prompt using a specified model.
@@ -223,6 +225,7 @@ def image_generation_process(
         num_inference_steps=50,
         guidance_scale=guidance_scale,
         delta=delta,
+        strength=strength,
     )
 
     monitor = monitor_receiver.recv()
@@ -306,6 +309,7 @@ def image_generation_process(
                 [r / 255, g / 255, b / 255]
             )  # 순수한 붉은색 (R, G, B)
             overlay_batch = overlay_color.view(3, 1, 1).expand_as(input_batch)
+
             # alpha = 0.5  # 오버레이 강도 (0: 원본 이미지, 1: 오버레이 색상)
             # input_batch = (1 - alpha) * input_batch + alpha * overlay_batch
             input_batch = (
@@ -319,6 +323,10 @@ def image_generation_process(
             #     input_batch = torchFunc.adjust_brightness(input_batch, val)
 
             input_batch = torchFunc.autocontrast(input_batch)
+
+            # noise_batch = torch.randn_like(input_batch)
+            # input_batch = input_batch + (0.1**0.5) * noise_batch
+            # input_batch = torchFunc.gaussian_blur(input_batch, 9)
 
             print("alpha", prompt_lerp)
             stream.stream.update_prompt(
@@ -384,6 +392,7 @@ def main(
     enable_similar_image_filter: bool = False,
     similar_image_filter_threshold: float = 0.95,
     similar_image_filter_max_skip_frame: float = 10,
+    strength: float = 1.6,
 ) -> None:
     """
     Main function to start the image generation and viewer processes.
@@ -432,6 +441,7 @@ def main(
             monitor_receiver,
             prompt_queue,
             hsv_queue,
+            strength,
         ),
     )
     process1.start()
