@@ -31,7 +31,23 @@ left = 0
 import numpy as np
 
 
-def start_flask_server(prompt_queue, hsv_queue):
+def printProgress(iteration, total, prefix="", suffix="", decimals=1, barLength=20):
+    formatStr = "{0:." + str(decimals) + "f}"
+    percent = formatStr.format(min(100 * (iteration / float(total)), 100))
+
+    filledLength = int(round(barLength * iteration / float(total)))
+    bar = "#" * filledLength + "-" * (barLength - filledLength)
+
+    # Use carriage return (\r) to overwrite the same line
+    sys.stdout.write(f"\r{prefix} |{bar}| {percent}% {suffix}")
+
+    # Ensure the progress bar is updated for the last iteration
+    if iteration == total:
+        sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
+def start_flask_server(prompt_queue, hsv_queue, strength_queue):
     """
     Starts the Flask server defined in server.py.
 
@@ -40,6 +56,7 @@ def start_flask_server(prompt_queue, hsv_queue):
     """
     server.prompt_queue = prompt_queue  # Share the queue with the server
     server.hsv_queue = hsv_queue
+    server.strength_queue = strength_queue
     server.socketio.run(server.app, host="0.0.0.0", port=5000)
 
 
@@ -57,7 +74,7 @@ def screen(
                 print("terminate read thread")
                 break
             img = sct.grab(
-                sct.monitors[2]
+                sct.monitors[1]
             )  # 여기 숫자 변경하면 사용모니터 변경가능, 1 ,2, 3 중에 때려맞추셈
             img = PIL.Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
             img.resize((height, width))
@@ -88,7 +105,7 @@ def dummy_screen(
 
     root.bind("<Configure>", update_geometry)
     root.mainloop()
-    mornitor_used = get_monitors()[2]  # get mornitor input from 3rd mornitor
+    mornitor_used = get_monitors()[0]  # get mornitor input from 3rd mornitor
     return {
         "top": mornitor_used.x,
         "left": mornitor_used.y,
@@ -130,6 +147,7 @@ def image_generation_process(
     monitor_receiver: Connection,
     prompt_queue: Queue,
     hsv_queue: Queue,
+    strength_queue: Queue,
     strength: float,
 ) -> None:
     """
@@ -186,6 +204,8 @@ def image_generation_process(
 
     common_prompt = "'single color', 'realism',  'extremely realistic', 'simple background', 'center focused', 'vignette', 'high resolution', 'single object'"
 
+    old_strength = strength = new_strength = 1.6
+
     current_prompt = prompt
     # target_hue = hue = 0.5
     # target_sat = sat = 1.0
@@ -197,6 +217,9 @@ def image_generation_process(
     prompt_lerp_threshold = 0.9
     prompt_lerp = 1
     hsv_lerp_threshold = 0.9
+
+    strength_lerp = 1
+    strength_lerp_threshold = 0.9
 
     last_valid_image = None
     global inputs
@@ -243,21 +266,39 @@ def image_generation_process(
             if len(inputs) < frame_buffer_size:
                 time.sleep(0.005)
                 continue
+
+            if not prompt_queue.empty():
+                new_prompt_item = (
+                    prompt_queue.get_nowait()
+                )  # Non-blocking queue retrieval
+                new_prompt = new_prompt_item[0]
+                new_color = new_prompt_item[1]
+
+                if new_prompt != current_prompt:
+                    current_prompt = new_prompt
+                    prompt_lerp = 1
+
+            if not strength_queue.empty():
+                strength_constant = int(strength_queue.get_nowait())
+                if strength_constant == 1:
+                    new_strength = 1.2
+                elif strength_constant == 0:
+                    new_strength = 1.0
+                else:
+                    new_strength = 1.6
+                print(f"\n\nNew Prompt : {new_prompt}")
+                print(f"New Tint Color : {new_color}")
+                print(f"Creativity : {round(new_strength,2)}")
+
             if not hsv_queue.empty():
                 new_hsv = hsv_queue.get_nowait()
 
                 target_r, target_g, target_b = new_hsv
+
                 # new_hsv = [(x / 100) for x in new_hsv]
                 # target_hue, target_sat, target_val = new_hsv
                 # target_hue -= 0.5
                 # print(f"hsv updated to: {target_hue}, {target_sat}, {target_val}")
-
-            if not prompt_queue.empty():
-                new_prompt = prompt_queue.get_nowait()  # Non-blocking queue retrieval
-                print(f"prompt updated to: {new_prompt}")
-                if new_prompt != current_prompt:
-                    current_prompt = new_prompt
-                    prompt_lerp = 1
 
             # hue = (
             #     hue * hsv_lerp_threshold + (1 - hsv_lerp_threshold) * target_hue
@@ -328,11 +369,21 @@ def image_generation_process(
             # input_batch = input_batch + (0.1**0.5) * noise_batch
             # input_batch = torchFunc.gaussian_blur(input_batch, 9)
 
-            print("alpha", prompt_lerp)
             stream.stream.update_prompt(
                 prompt="(" + out_prompt + ")," + common_prompt, alpha=prompt_lerp
             )
+            if strength != new_strength:
+                old_strength = strength
+                strength = new_strength
+                strength_lerp = 1
+
+            lerp = strength_lerp * old_strength + (1 - strength_lerp) * strength
+            stream.stream.update_strength(strength=lerp)
+
             prompt_lerp = prompt_lerp * prompt_lerp_threshold
+            strength_lerp = strength_lerp * strength_lerp_threshold
+
+            printProgress(1 - strength_lerp, 0.8, "Application Strength : ", "")
             input_batch = (input_batch) * 2 - 1
 
             inputs.clear()
@@ -402,6 +453,7 @@ def main(
     fps_queue = ctx.Queue()
     prompt_queue = ctx.Queue()  # Queue for updating prompts in real time
     hsv_queue = ctx.Queue()
+    strength_queue = ctx.Queue()
 
     close_queue = Queue()
 
@@ -411,6 +463,7 @@ def main(
         args=(
             prompt_queue,
             hsv_queue,
+            strength_queue,
         ),
     )
     flask_process.start()
@@ -441,6 +494,7 @@ def main(
             monitor_receiver,
             prompt_queue,
             hsv_queue,
+            strength_queue,
             strength,
         ),
     )

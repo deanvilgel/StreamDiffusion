@@ -282,9 +282,12 @@ class StreamDiffusion:
         self,
         strength: float,
     ) -> None:
-        self.scheduler.set_timesteps(
-            self.num_inference_steps, self.device, strength=strength
-        )
+        print(strength)
+        new_alphas = torch.pow(self.scheduler.alphas_cumprod, strength)
+        new_betas = 1 - new_alphas
+
+        # self.alpha_prod_t_sqrt = torch.sqrt(new_alphas)
+        # self.beta_prod_t_sqrt = torch.sqrt(new_betas)
 
     def add_noise(
         self,

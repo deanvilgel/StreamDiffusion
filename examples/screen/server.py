@@ -10,6 +10,7 @@ socketio = SocketIO(app)
 ctx = get_context("spawn")
 prompt_queue = ctx.Queue()
 hsv_queue = ctx.Queue()
+strength_queue = ctx.Queue()
 
 
 # Flask route to serve the HTML page
@@ -22,8 +23,12 @@ def index():
 @socketio.on("update_prompt")
 def handle_update_prompt(data):
     prompt = data.get("prompt", "")
-    prompt_queue.put(prompt)
-    print(f"Received new prompt: {prompt}")
+    colorName = data.get("colorName", "")
+    color = data.get("colorCode", {"r": 0, "g": 0, "b": 0})
+    r, g, b = color.values()
+
+    prompt_queue.put([prompt, colorName])
+    hsv_queue.put([int(r), int(g), int(b)])
 
 
 # @socketio.on("update_hsv")
@@ -43,7 +48,13 @@ def handle_update_rgb(data):
     b = data.get("b", 0)
     # print(hue, sat, val)
     hsv_queue.put([int(r), int(g), int(b)])
-    print(f"Received new color {r, g, b}")
+
+
+@socketio.on("update_strength")
+def handle_update_rgb(data):
+    strength = data.get("strength", 0)
+
+    strength_queue.put(strength)
 
 
 # Start the Flask app with SocketIO

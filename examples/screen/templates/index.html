@@ -22,14 +22,15 @@
 <body>
     <h2>Enter your prompt</h2>
     <input type="text" id="promptInput" placeholder="Type your prompt here...">
-    <h4 id="current Prompts">orange slices on table, fruitful color, detailed section of a fruit, sliced fruit</h4>
+    <h4 id="current Prompts">Huge Computer</h4>
     <h2>Hue Shift</h2>
     <input type="range" id="hue" min="0" max="100" value="0">
     <h2>Saturation</h2>
     <input type="range" id="sat" min="0" max="100" value="100">
     <h2>Value</h2>
     <input type="range" id="val" min="50" max="150" value="100">
-
+    <h2>DenoiseStrength</h2>
+    <input type="range" id="strength" min="0" max="2" value="0">
 
 
     <!-- Include SocketIO JavaScript library -->
@@ -37,51 +38,56 @@
     <script>
 
         const promptExample = [
-            "Huge Computer", //중, 그레이, 기계
-            "Vibrant Coral Reef", //소, 화려, 자연
-            "Large Spilled Ice Cream", //소, 푹신, 사물
-            "Giant Wave Ocean", // 대, 청, 자연
-            "Golden Pyramid", // 대, 갈, 돌
-            "Glowing Jellyfish", //소, 푸른/빛나는, 생물
-            "Molten Gold", //중, 노, 돌
-            "Floating Hot Air Balloon", //대, 화려, 사물
-            "Section of Orange", //소, 오렌지, 사물
-            "Crystal Cave", //중, 화려, 돌
-            "Big Fluffy Cloud", //중, 흰, 푹신
-            "Frozen Glacier", //대, 하양/청, 돌
-            "Whale Breaching the Ocean", //대, 청, 자연
-            "Burning Meteor", //중, 붉은/주황, 돌
-            "Towering Redwoods", //대, 갈/녹, 자연
-            "Electric Lightning Bolt", //중, 청/흰, 기계
-            "Cracked Desert Earth", //중, 갈/황, 돌
-            "Shimmering Starfield", //대, 흰/빛나는, 우주
-            "Twinkling Fireflies", //소, 노/빛나는, 생물
-            "Enormous Moon", //대, 은빛, 돌
-            "Giant Spider Web", //중, 은/흰, 생물
-            "Massive Waterfall", //대, 흰/청, 자연
-            "Majestic Mountain Peak", //대, 회/흰, 돌
-            "Floating Space Station", //대, 은/회, 기계
-            "Colorful Aurora", //대, 화려/다색, 자연
-            "Deep Canyon", //대, 갈/황, 돌
+            { "Prompt": "Huge Computer", "Color": ["Blue Jeans", "Orange-Yellow (Crayola)"] }, //중, 그레이, 기계
+            { "Prompt": "Vibrant Coral Reef", "Color": ["Blue Jeans"] }, //소, 화려, 자연
+            { "Prompt": "Large Spilled Ice Cream", "Color": ["Orange-Yellow (Crayola)", "Yellow Orange"] }, //소, 푹신, 사물
+            { "Prompt": "Giant Wave Ocean", "Color": ["Blue Jeans"] }, // 대, 청, 자연
+            { "Prompt": "Golden Pyramid", "Color": ["Orange-Yellow (Crayola)", "Yellow Orange"] }, // 대, 갈, 돌
+            { "Prompt": "Glowing Jellyfish", "Color": ["Blue Jeans", "Blood Red"] }, //소, 푸른/빛나는, 생물
+            { "Prompt": "Molten Gold", "Color": ["Orange-Yellow (Crayola)", "Yellow Orange"] }, //중, 노, 돌
+            { "Prompt": "Floating Hot Air Balloon", "Color": ["Cardinal", "Orange-Yellow (Crayola)", "Yellow Orange", "Blood Red"] }, //대, 화려, 사물
+            { "Prompt": "Section of Orange", "Color": ["Orange-Yellow (Crayola)", "Yellow Orange"] }, //소, 오렌지, 사물
+            { "Prompt": "Crystal Cave", "Color": ["Blue Jeans"] }, //중, 화려, 돌
+            { "Prompt": "Big Fluffy Cloud", "Color": ["Orange-Yellow (Crayola)", "Yellow Orange"] }, //중, 흰, 푹신
+            { "Prompt": "Frozen Glacier", "Color": ["Blue Jeans"] }, //대, 하양/청, 돌
+            { "Prompt": "Whale Breaching the Ocean", "Color": ["Blue Jeans"] }, //대, 청, 자연
+            { "Prompt": "Burning Meteor", "Color": ["Cardinal", "Blood Red"] }, //중, 붉은/주황, 돌
+            { "Prompt": "Towering Redwoods", "Color": ["Cardinal", "Blood Red"] }, //대, 갈/녹, 자연
+            { "Prompt": "Electric Lightning Bolt", "Color": ["Cardinal"] }, //중, 청/흰, 기계
+            { "Prompt": "Cracked Desert Earth", "Color": ["Orange-Yellow (Crayola)"] }, //중, 갈/황, 돌
+            { "Prompt": "Shimmering Starfield", "Color": ["Blue Jeans"] }, //대, 흰/빛나는, 우주
+            { "Prompt": "Twinkling Fireflies", "Color": ["Blood Red"] }, //소, 노/빛나는, 생물
+            { "Prompt": "Enormous Moon", "Color": ["Yellow Orange"] }, //대, 은빛, 돌
+            { "Prompt": "Giant Spider Web", "Color": ["Orange-Yellow (Crayola)"] }, //중, 은/흰, 생물
+            { "Prompt": "Massive Waterfall", "Color": ["Blue Jeans"] }, //대, 흰/청, 자연
+            { "Prompt": "Majestic Mountain Peak", "Color": ["Blue Jeans"] }, //대, 회/흰, 돌
+            { "Prompt": "Floating Space Station", "Color": ["Blood Red"] }, //대, 은/회, 기계
+            { "Prompt": "Colorful Aurora", "Color": ["Orange-Yellow (Crayola)"] }, //대, 화려/다색, 자연
+            { "Prompt": "Deep Canyon", "Color": ["Yellow Orange"] }, //대, 갈/황, 돌
         ];
-        const colorExample = [
-            "#BF1B39",
-            "#5CACF2",
-            "#F2DB66",
-            "#F2A649",
-            "#590202",
-        ];
+        const colorTranslate =
+        {
+            "Cardinal": "#BF1B39",
+            "Blue Jeans": "#5CACF2",
+            "Orange-Yellow (Crayola)": "#F2DB66",
+            "Yellow Orange": "#F2A649",
+            "Blood Red": "#590202",
+        };
+        const strengthPool = [
+            0,
+            2,
+        ]
         // Connect to the SocketIO server
         const socket = io.connect('http://' + document.domain + ':' + location.port);
 
         // Function to select a random prompt key from promptExample
         function getNextPrompt(currentText) {
-            // Assuming `promptExample` is an array of prompts
-
-            const currentIndex = promptExample.indexOf(currentText)
-            const nextIndex = (currentIndex + 1) % (promptExample.length);
+            // Find the index of the current prompt by comparing the "Prompt" field
+            const currentIndex = promptExample.findIndex(item => item.Prompt === currentText);
+            console.log(currentIndex);
+            // Get the next prompt using modular arithmetic for cycling
+            const nextIndex = (currentIndex + 1) % promptExample.length;
             const selected = promptExample[nextIndex];
-            console.log(nextIndex);
             return selected;
         }
 
@@ -89,6 +95,8 @@
         const hueInput = document.getElementById('hue');
         const saturationInput = document.getElementById('sat');
         const valueInput = document.getElementById('val');
+
+        const strengthInput = document.getElementById('strength');
 
         const promptValue = document.getElementById('current Prompts')
 
@@ -101,8 +109,8 @@
             };
         }
 
-        function getRandomColor() {
-            hex = colorExample[Math.floor(Math.random() * colorExample.length)]
+        function getRandomColor(color) {
+            const hex = colorTranslate[color];
             var result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
             return result ? {
                 r: parseInt(result[1], 16),
@@ -122,20 +130,33 @@
                 // Get random HSV and prompt
                 const newHSV = getRandomHSV();
                 const newPrompt = getNextPrompt(promptValue.innerText);
-                const randomColor = getRandomColor();
+
+                const { Prompt, Color } = newPrompt
+                const colorName = Color[Math.floor(Math.random() * Color.length)];
+                const colorCode = getRandomColor(colorName);
 
                 // Emit the random prompt
-                socket.emit('update_prompt', { prompt: newPrompt });
+                socket.emit('update_prompt', { prompt: Prompt, colorName: colorName, colorCode: colorCode });
                 // Emit the lerped values
                 socket.emit('update_hsv', newHSV);
-
-                socket.emit('update_rgb', randomColor)
                 // Update input fields to new random values
                 hueInput.value = newHSV.hue;
                 saturationInput.value = newHSV.sat;
                 valueInput.value = newHSV.val;
-                promptValue.innerText = newPrompt;
+                promptValue.innerText = Prompt;
             }, 5000); // Every 5 seconds
+
+            setInterval(() => {
+                // Parse the current value as a float to ensure correct comparison
+                const newStrength = (1 - parseInt(strengthInput.value) / 2) * 2
+
+                // Emit the new strength value to the server via Socket.IO
+                socket.emit('update_strength', { strength: newStrength });
+
+                // Update the input field with the new value as a string
+                strengthInput.value = newStrength.toString();
+
+            }, 2500); // Every 2.5 seconds
         }
 
         // Start the periodic HSV update
