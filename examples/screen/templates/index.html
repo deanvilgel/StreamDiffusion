@@ -144,7 +144,7 @@
                 saturationInput.value = newHSV.sat;
                 valueInput.value = newHSV.val;
                 promptValue.innerText = Prompt;
-            }, 5000); // Every 5 seconds
+            }, 10000); // Every 5 seconds
 
             setInterval(() => {
                 // Parse the current value as a float to ensure correct comparison
@@ -156,7 +156,7 @@
                 // Update the input field with the new value as a string
                 strengthInput.value = newStrength.toString();
 
-            }, 2500); // Every 2.5 seconds
+            }, 5000); // Every 2.5 seconds
         }
 
         // Start the periodic HSV update

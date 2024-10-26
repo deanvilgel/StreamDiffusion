@@ -33,6 +33,7 @@ import numpy as np
 
 def printProgress(iteration, total, prefix="", suffix="", decimals=1, barLength=20):
     formatStr = "{0:." + str(decimals) + "f}"
+
     percent = formatStr.format(min(100 * (iteration / float(total)), 100))
 
     filledLength = int(round(barLength * iteration / float(total)))
@@ -42,8 +43,8 @@ def printProgress(iteration, total, prefix="", suffix="", decimals=1, barLength=
     sys.stdout.write(f"\r{prefix} |{bar}| {percent}% {suffix}")
 
     # Ensure the progress bar is updated for the last iteration
-    if iteration == total:
-        sys.stdout.write("\n")
+    # if iteration == total:
+    #     sys.stdout.write("\n")
     sys.stdout.flush()
 
 
@@ -74,7 +75,7 @@ def screen(
                 print("terminate read thread")
                 break
             img = sct.grab(
-                sct.monitors[1]
+                sct.monitors[2]
             )  # 여기 숫자 변경하면 사용모니터 변경가능, 1 ,2, 3 중에 때려맞추셈
             img = PIL.Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
             img.resize((height, width))
@@ -214,12 +215,13 @@ def image_generation_process(
     target_g = g = 1.0
     target_b = b = 1.0
 
-    prompt_lerp_threshold = 0.9
+    prompt_lerp_threshold = 0.95
     prompt_lerp = 1
-    hsv_lerp_threshold = 0.9
+    hsv_lerp_threshold = 0.95
 
     strength_lerp = 1
     strength_lerp_threshold = 0.9
+    is_print = True
 
     last_valid_image = None
     global inputs
@@ -383,7 +385,14 @@ def image_generation_process(
             prompt_lerp = prompt_lerp * prompt_lerp_threshold
             strength_lerp = strength_lerp * strength_lerp_threshold
 
-            printProgress(1 - strength_lerp, 0.8, "Application Strength : ", "")
+            if is_print:
+                printProgress(1 - strength_lerp, 0.8, "Application Strength : ", "")
+
+            if 1 - strength_lerp > 0.8:
+                is_print = False
+            else:
+                is_print = True
+
             input_batch = (input_batch) * 2 - 1
 
             inputs.clear()
