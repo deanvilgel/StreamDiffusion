@@ -11,26 +11,49 @@
             margin: 20px;
         }
 
-        input {
-            width: 100%;
-            padding: 10px;
+        input,
+        select,
+        button {
             font-size: 16px;
+            padding: 10px;
+            margin: 5px 0;
+        }
+
+        .prompt-list {
+            margin-top: 20px;
+        }
+
+        .prompt-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 5px 0;
         }
     </style>
 </head>
 
 <body>
-    <h2>Enter your prompt</h2>
-    <input type="text" id="promptInput" placeholder="Type your prompt here...">
+    <h2>Current Prompt</h2>
     <h4 id="current Prompts">Huge Computer</h4>
-    <h2>Hue Shift</h2>
-    <input type="range" id="hue" min="0" max="100" value="0">
-    <h2>Saturation</h2>
-    <input type="range" id="sat" min="0" max="100" value="100">
-    <h2>Value</h2>
-    <input type="range" id="val" min="50" max="150" value="100">
-    <h2>DenoiseStrength</h2>
-    <input type="range" id="strength" min="0" max="2" value="0">
+    <div>
+        <label for="newPromptText">Prompt Text:</label>
+        <input type="text" id="newPromptText" placeholder="Enter prompt text">
+
+        <label for="newColorSelect">Select Color:</label>
+        <select id="newColorSelect">
+            <option value="Blue Jeans">Blue Jeans</option>
+            <option value="Orange-Yellow (Crayola)">Orange-Yellow (Crayola)</option>
+            <option value="Yellow Orange">Yellow Orange</option>
+            <option value="Cardinal">Cardinal</option>
+            <option value="Blood Red">Blood Red</option>
+        </select>
+
+        <button onclick="addPrompt()">Add Prompt</button>
+    </div>
+
+    <div class="prompt-list" id="promptList"></div>
+    <h2>MaxCreativity</h2>
+    <input type="number" step="0.1" id="strength" min="1.0" max="1.6" value="1.6">
 
 
     <!-- Include SocketIO JavaScript library -->
@@ -57,7 +80,7 @@
             { "Prompt": "Cracked Desert Earth", "Color": ["Orange-Yellow (Crayola)"] }, //중, 갈/황, 돌
             { "Prompt": "Shimmering Starfield", "Color": ["Blue Jeans"] }, //대, 흰/빛나는, 우주
             { "Prompt": "Twinkling Fireflies", "Color": ["Blood Red"] }, //소, 노/빛나는, 생물
-            { "Prompt": "Enormous Moon", "Color": ["Yellow Orange"] }, //대, 은빛, 돌
+            { "Prompt": "White Surface of Moon", "Color": ["Yellow Orange"] }, //대, 은빛, 돌
             { "Prompt": "Giant Spider Web", "Color": ["Orange-Yellow (Crayola)"] }, //중, 은/흰, 생물
             { "Prompt": "Massive Waterfall", "Color": ["Blue Jeans"] }, //대, 흰/청, 자연
             { "Prompt": "Majestic Mountain Peak", "Color": ["Blue Jeans"] }, //대, 회/흰, 돌
@@ -65,6 +88,45 @@
             { "Prompt": "Colorful Aurora", "Color": ["Orange-Yellow (Crayola)"] }, //대, 화려/다색, 자연
             { "Prompt": "Deep Canyon", "Color": ["Yellow Orange"] }, //대, 갈/황, 돌
         ];
+        const promptList = document.getElementById('promptList');
+
+        // Function to render the prompt list
+        function renderPromptList() {
+            promptList.innerHTML = '';
+            promptExample.forEach((item, index) => {
+                const promptItem = document.createElement('div');
+                promptItem.classList.add('prompt-item');
+                promptItem.innerHTML = `
+                    <span>${item.Prompt} - Colors: ${item.Color.join(', ')}</span>
+                    <button onclick="removePrompt(${index})">Remove</button>
+                `;
+                promptList.appendChild(promptItem);
+            });
+        }
+
+        // Function to add a new prompt
+        function addPrompt() {
+            const promptText = document.getElementById('newPromptText').value;
+            const selectedColor = document.getElementById('newColorSelect').value;
+
+            if (promptText) {
+                // Add the new prompt to the promptExample array
+                promptExample.push({ "Prompt": promptText, "Color": [selectedColor] });
+                renderPromptList();
+            }
+        }
+
+        // Function to remove a prompt by index
+        function removePrompt(index) {
+            promptExample.splice(index, 1);
+            renderPromptList();
+        }
+
+        // Initial rendering of prompt list
+        renderPromptList();
+
+
+
         const colorTranslate =
         {
             "Cardinal": "#BF1B39",
@@ -91,23 +153,9 @@
             return selected;
         }
 
-        // Select input fields for HSV
-        const hueInput = document.getElementById('hue');
-        const saturationInput = document.getElementById('sat');
-        const valueInput = document.getElementById('val');
-
         const strengthInput = document.getElementById('strength');
 
         const promptValue = document.getElementById('current Prompts')
-
-        // Function to generate random HSV values
-        function getRandomHSV() {
-            return {
-                hue: Math.floor(Math.random() * 100), // Hue range: 0 to 360
-                sat: Math.floor(Math.random() * 100), // Saturation range: 0 to 100
-                val: Math.floor(Math.random() * 100) + 50, // Value range: 0 to 100
-            };
-        }
 
         function getRandomColor(color) {
             const hex = colorTranslate[color];
@@ -128,7 +176,7 @@
         function updateHSVPeriodically() {
             setInterval(() => {
                 // Get random HSV and prompt
-                const newHSV = getRandomHSV();
+                // const newHSV = getRandomHSV();
                 const newPrompt = getNextPrompt(promptValue.innerText);
 
                 const { Prompt, Color } = newPrompt
@@ -137,26 +185,22 @@
 
                 // Emit the random prompt
                 socket.emit('update_prompt', { prompt: Prompt, colorName: colorName, colorCode: colorCode });
-                // Emit the lerped values
-                socket.emit('update_hsv', newHSV);
-                // Update input fields to new random values
-                hueInput.value = newHSV.hue;
-                saturationInput.value = newHSV.sat;
-                valueInput.value = newHSV.val;
                 promptValue.innerText = Prompt;
             }, 10000); // Every 5 seconds
 
+            let toggle = true; // Initialize a toggle flag
+
             setInterval(() => {
-                // Parse the current value as a float to ensure correct comparison
-                const newStrength = (1 - parseInt(strengthInput.value) / 2) * 2
+                // Determine the new strength value based on the toggle state
+                const newStrength = toggle ? 1.0 : parseFloat(strengthInput.value);
 
                 // Emit the new strength value to the server via Socket.IO
                 socket.emit('update_strength', { strength: newStrength });
 
-                // Update the input field with the new value as a string
-                strengthInput.value = newStrength.toString();
+                // Toggle the state for the next interval
+                toggle = !toggle;
 
-            }, 5000); // Every 2.5 seconds
+            }, 5000); // Every 5 seconds
         }
 
         // Start the periodic HSV update
@@ -165,55 +209,3 @@
 </body>
 
 </html>
-
-
-
-<!-- 
-const promptExample = {
-    "orange slices on table, fruitful color, detailed section of a fruit, sliced fruit": 1,
-    "MegaFlora, LargeForest, Large Greenary, small river": 0,
-    "MegaStruction, Metallic City, Made of Metal or Glass": 0
-}
-
-// Connect to the SocketIO server
-const socket = io.connect('http://' + document.domain + ':' + location.port);
-// Debounce function to delay the execution of a function
-function debounce(func, delay) {
-    let timeout;
-    return function (...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func.apply(this, args), delay);
-    };
-}
-// Select the input field
-const promptInput = document.getElementById('promptInput');
-
-// Add an event listener to detect changes and send to the server
-// Debounced function to emit the prompt to the server
-const debouncedEmitPrompt = debounce(() => {
-    const prompt = promptInput.value;
-    // Emit the updated prompt to the server
-    socket.emit('update_prompt', { prompt: prompt });
-}, 500); // Delay of 1000 milliseconds (1 second)
-
-// Event listener for the input event, using the debounced function
-promptInput.addEventListener('input', debouncedEmitPrompt);
-
-
-
-
-// Select the input field
-const hueInput = document.getElementById('hue');
-const saturationInput = document.getElementById('sat');
-const valueInput = document.getElementById('val');
-
-const updateHSV = debounce(() => {
-    const hue = hueInput.value;
-    const sat = saturationInput.value;
-    const val = valueInput.value;
-    socket.emit('update_hsv', { hue: hue, sat: sat, val: val });
-}, 500)
-
-hueInput.addEventListener('input', updateHSV);
-saturationInput.addEventListener('input', updateHSV);
-valueInput.addEventListener('input', updateHSV); -->

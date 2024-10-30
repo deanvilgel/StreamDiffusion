@@ -52,9 +52,11 @@ def handle_update_rgb(data):
 
 @socketio.on("update_strength")
 def handle_update_rgb(data):
-    strength = data.get("strength", 0)
+    strength = data.get("strength", 1.6)
 
-    strength_queue.put(strength)
+    strength_queue.put(
+        int(strength * 10)
+    )  # int가 아니면 queue가 동작 안할 수도 있어서 정수화 후 보냄
 
 
 # Start the Flask app with SocketIO

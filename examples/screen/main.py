@@ -75,7 +75,7 @@ def screen(
                 print("terminate read thread")
                 break
             img = sct.grab(
-                sct.monitors[2]
+                sct.monitors[3]
             )  # 여기 숫자 변경하면 사용모니터 변경가능, 1 ,2, 3 중에 때려맞추셈
             img = PIL.Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
             img.resize((height, width))
@@ -215,9 +215,9 @@ def image_generation_process(
     target_g = g = 1.0
     target_b = b = 1.0
 
-    prompt_lerp_threshold = 0.95
+    prompt_lerp_threshold = 0.9
     prompt_lerp = 1
-    hsv_lerp_threshold = 0.95
+    hsv_lerp_threshold = 0.9
 
     strength_lerp = 1
     strength_lerp_threshold = 0.9
@@ -276,21 +276,21 @@ def image_generation_process(
                 new_prompt = new_prompt_item[0]
                 new_color = new_prompt_item[1]
 
-                if new_prompt != current_prompt:
-                    current_prompt = new_prompt
-                    prompt_lerp = 1
-
             if not strength_queue.empty():
-                strength_constant = int(strength_queue.get_nowait())
-                if strength_constant == 1:
-                    new_strength = 1.2
-                elif strength_constant == 0:
-                    new_strength = 1.0
-                else:
-                    new_strength = 1.6
+                new_strength = int(strength_queue.get_nowait()) / 10
+                new_prompt = "" if round(new_strength, 2) == 1.0 else new_prompt
+
                 print(f"\n\nNew Prompt : {new_prompt}")
                 print(f"New Tint Color : {new_color}")
                 print(f"Creativity : {round(new_strength,2)}")
+
+            if new_prompt != current_prompt:
+                current_prompt = new_prompt
+                prompt_lerp = 1
+            if strength != new_strength:
+                old_strength = strength
+                strength = new_strength
+                strength_lerp = 1
 
             if not hsv_queue.empty():
                 new_hsv = hsv_queue.get_nowait()
@@ -351,13 +351,15 @@ def image_generation_process(
             overlay_color = torch.tensor(
                 [r / 255, g / 255, b / 255]
             )  # 순수한 붉은색 (R, G, B)
-            overlay_batch = overlay_color.view(3, 1, 1).expand_as(input_batch)
+            overlay_strength = (
+                strength_lerp if round(new_strength, 2) == 1.0 else 1 - strength_lerp
+            )  # Set the strength between 0 (no overlay) and 1 (full overlay)
 
-            # alpha = 0.5  # 오버레이 강도 (0: 원본 이미지, 1: 오버레이 색상)
-            # input_batch = (1 - alpha) * input_batch + alpha * overlay_batch
-            input_batch = (
-                1 - 2 * overlay_batch
-            ) * input_batch**2 + 2 * overlay_batch * input_batch
+            overlay_batch = overlay_color.view(3, 1, 1).expand_as(input_batch)
+            input_batch = (1 - overlay_strength) * input_batch + overlay_strength * (
+                (1 - 2 * overlay_batch) * input_batch**2
+                + 2 * overlay_batch * input_batch
+            )
 
             # hsv adjustment
             # with torch.no_grad():
@@ -370,14 +372,9 @@ def image_generation_process(
             # noise_batch = torch.randn_like(input_batch)
             # input_batch = input_batch + (0.1**0.5) * noise_batch
             # input_batch = torchFunc.gaussian_blur(input_batch, 9)
-
             stream.stream.update_prompt(
                 prompt="(" + out_prompt + ")," + common_prompt, alpha=prompt_lerp
             )
-            if strength != new_strength:
-                old_strength = strength
-                strength = new_strength
-                strength_lerp = 1
 
             lerp = strength_lerp * old_strength + (1 - strength_lerp) * strength
             stream.stream.update_strength(strength=lerp)
@@ -438,7 +435,7 @@ def main(
         # "C:/Users/ERSATZ-CAMPUSTOWN/StreamDiffusion/models/LoRA/xsarchitectural-7.safetensors": 1,
     },
     prompt: str = "architectural rendering, beautiful interior",
-    negative_prompt: str = "ugly, complex, dull, low quality, bad quality, blurry, low resolution, noise, fog",
+    negative_prompt: str = "ugly, complex, dull, low quality, bad quality, blurry, low resolution, noise, fog, human face",
     frame_buffer_size: int = 1,
     width: int = 720,
     height: int = 405,
