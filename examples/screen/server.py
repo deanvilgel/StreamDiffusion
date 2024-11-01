@@ -52,7 +52,7 @@ def handle_update_rgb(data):
 
 @socketio.on("update_strength")
 def handle_update_rgb(data):
-    strength = data.get("strength", 1.6)
+    strength = data.get("strength", 0.6)
 
     strength_queue.put(
         int(strength * 10)

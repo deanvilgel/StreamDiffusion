@@ -205,7 +205,7 @@ def image_generation_process(
 
     common_prompt = "'single color', 'realism',  'extremely realistic', 'simple background', 'center focused', 'vignette', 'high resolution', 'single object'"
 
-    old_strength = strength = new_strength = 1.6
+    old_strength = strength = new_strength = 0.6
 
     current_prompt = prompt
     # target_hue = hue = 0.5
@@ -250,7 +250,7 @@ def image_generation_process(
         num_inference_steps=50,
         guidance_scale=guidance_scale,
         delta=delta,
-        strength=strength,
+        strength=strength + 1,
     )
 
     monitor = monitor_receiver.recv()
@@ -278,7 +278,7 @@ def image_generation_process(
 
             if not strength_queue.empty():
                 new_strength = int(strength_queue.get_nowait()) / 10
-                new_prompt = "" if round(new_strength, 2) == 1.0 else new_prompt
+                new_prompt = "" if round(new_strength, 2) == 0.0 else new_prompt
 
                 print(f"\n\nNew Prompt : {new_prompt}")
                 print(f"New Tint Color : {new_color}")
@@ -352,7 +352,7 @@ def image_generation_process(
                 [r / 255, g / 255, b / 255]
             )  # 순수한 붉은색 (R, G, B)
             overlay_strength = (
-                strength_lerp if round(new_strength, 2) == 1.0 else 1 - strength_lerp
+                strength_lerp if round(new_strength, 2) == 0.0 else 1 - strength_lerp
             )  # Set the strength between 0 (no overlay) and 1 (full overlay)
 
             overlay_batch = overlay_color.view(3, 1, 1).expand_as(input_batch)
@@ -376,7 +376,7 @@ def image_generation_process(
                 prompt="(" + out_prompt + ")," + common_prompt, alpha=prompt_lerp
             )
 
-            lerp = strength_lerp * old_strength + (1 - strength_lerp) * strength
+            lerp = strength_lerp * old_strength + (1 - strength_lerp) * strength + 1
             stream.stream.update_strength(strength=lerp)
 
             prompt_lerp = prompt_lerp * prompt_lerp_threshold
